@@ -34,15 +34,38 @@ PRODUCTS = {
     ],
 }
 
+# Смайлики для категорий
+CATEGORY_EMOJIS = {
+    "Рыба": "🐟",
+    "Икра": "🦑",
+    "Крабы": "🦀",
+}
+
 # Стартовое сообщение
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     keyboard = [
-        [InlineKeyboardButton(category, callback_data=category)] for category in PRODUCTS
+        [InlineKeyboardButton(f"{CATEGORY_EMOJIS.get(category, '')} {category}", callback_data=category)]
+        for category in PRODUCTS
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text(
         "Добро пожаловать в магазин Зов Океан! Выберите категорию:", reply_markup=reply_markup
     )
+
+# Кнопка "Назад"
+async def back_to_categories(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    keyboard = [
+        [InlineKeyboardButton(f"{CATEGORY_EMOJIS.get(category, '')} {category}", callback_data=category)]
+        for category in PRODUCTS
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await update.callback_query.edit_message_text(
+        text="Выберите категорию:", reply_markup=reply_markup
+    )
+
+# Кнопка "На главную"
+async def back_to_main(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    await start(update, context)
 
 # Вывод категорий
 async def category_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -55,6 +78,7 @@ async def category_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) 
             [InlineKeyboardButton(subcategory, callback_data=f"{category}:{subcategory}")]
             for subcategory in PRODUCTS[category]
         ]
+        keyboard.append([InlineKeyboardButton("Назад", callback_data="back")])
         reply_markup = InlineKeyboardMarkup(keyboard)
         await query.edit_message_text(
             text=f"Категория: {category}\nВыберите подкатегорию:", reply_markup=reply_markup
@@ -64,7 +88,12 @@ async def category_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         text = "\n".join(
             [f"{item['name']} - {item['price']} руб ({item['unit']})" for item in items]
         )
-        await query.edit_message_text(text=f"Категория: {category}\n\n{text}")
+        keyboard = [
+            [InlineKeyboardButton("На главную", callback_data="main")],
+            [InlineKeyboardButton("Назад", callback_data="back")],
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.edit_message_text(text=f"Категория: {category}\n\n{text}", reply_markup=reply_markup)
 
 # Вывод товаров из подкатегорий
 async def subcategory_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -76,7 +105,12 @@ async def subcategory_callback(update: Update, context: ContextTypes.DEFAULT_TYP
     text = "\n".join(
         [f"{item['name']} - {item['price']} руб ({item['unit']})" for item in items]
     )
-    await query.edit_message_text(text=f"Категория: {category} -> {subcategory}\n\n{text}")
+    keyboard = [
+        [InlineKeyboardButton("На главную", callback_data="main")],
+        [InlineKeyboardButton("Назад", callback_data=f"{category}")],
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await query.edit_message_text(text=f"Категория: {category} -> {subcategory}\n\n{text}", reply_markup=reply_markup)
 
 # Основной обработчик
 def main() -> None:
@@ -87,6 +121,8 @@ def main() -> None:
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CallbackQueryHandler(category_callback, pattern="^[^:]+$"))
     application.add_handler(CallbackQueryHandler(subcategory_callback, pattern=".+:.+"))
+    application.add_handler(CallbackQueryHandler(back_to_categories, pattern="^back$"))
+    application.add_handler(CallbackQueryHandler(back_to_main, pattern="^main$"))
 
     # Запускаем бота
     application.run_polling()
