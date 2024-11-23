@@ -1,5 +1,5 @@
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Updater, CommandHandler, CallbackQueryHandler, CallbackContext
+from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
 
 # Данные о товарах
 PRODUCTS = {
@@ -35,17 +35,19 @@ PRODUCTS = {
 }
 
 # Стартовое сообщение
-def start(update: Update, context: CallbackContext) -> None:
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     keyboard = [
         [InlineKeyboardButton(category, callback_data=category)] for category in PRODUCTS
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    update.message.reply_text("Добро пожаловать в магазин Зов Океан! Выберите категорию:", reply_markup=reply_markup)
+    await update.message.reply_text(
+        "Добро пожаловать в магазин Зов Океан! Выберите категорию:", reply_markup=reply_markup
+    )
 
 # Вывод категорий
-def category_callback(update: Update, context: CallbackContext) -> None:
+async def category_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
-    query.answer()
+    await query.answer()
     category = query.data
 
     if isinstance(PRODUCTS[category], dict):  # Подкатегории
@@ -54,36 +56,40 @@ def category_callback(update: Update, context: CallbackContext) -> None:
             for subcategory in PRODUCTS[category]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
-        query.edit_message_text(text=f"Категория: {category}\nВыберите подкатегорию:", reply_markup=reply_markup)
+        await query.edit_message_text(
+            text=f"Категория: {category}\nВыберите подкатегорию:", reply_markup=reply_markup
+        )
     else:  # Товары
         items = PRODUCTS[category]
         text = "\n".join(
             [f"{item['name']} - {item['price']} руб ({item['unit']})" for item in items]
         )
-        query.edit_message_text(text=f"Категория: {category}\n\n{text}")
+        await query.edit_message_text(text=f"Категория: {category}\n\n{text}")
 
 # Вывод товаров из подкатегорий
-def subcategory_callback(update: Update, context: CallbackContext) -> None:
+async def subcategory_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
-    query.answer()
+    await query.answer()
     category, subcategory = query.data.split(":")
 
     items = PRODUCTS[category][subcategory]
     text = "\n".join(
         [f"{item['name']} - {item['price']} руб ({item['unit']})" for item in items]
     )
-    query.edit_message_text(text=f"Категория: {category} -> {subcategory}\n\n{text}")
+    await query.edit_message_text(text=f"Категория: {category} -> {subcategory}\n\n{text}")
 
 # Основной обработчик
 def main() -> None:
-    updater = Updater("YOUR_TELEGRAM_BOT_TOKEN")
+    # Замените "YOUR_TELEGRAM_BOT_TOKEN" на токен вашего бота
+    application = Application.builder().token("7779581117:AAEvf8misr26hqzRoyRHXR-ip6NlohJWKAk").build()
 
-    updater.dispatcher.add_handler(CommandHandler("start", start))
-    updater.dispatcher.add_handler(CallbackQueryHandler(category_callback, pattern="^[^:]+$"))
-    updater.dispatcher.add_handler(CallbackQueryHandler(subcategory_callback, pattern=".+:.+"))
+    # Добавляем обработчики команд и колбэков
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(CallbackQueryHandler(category_callback, pattern="^[^:]+$"))
+    application.add_handler(CallbackQueryHandler(subcategory_callback, pattern=".+:.+"))
 
-    updater.start_polling()
-    updater.idle()
+    # Запускаем бота
+    application.run_polling()
 
 if __name__ == "__main__":
     main()
